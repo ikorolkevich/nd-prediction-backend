@@ -1,5 +1,11 @@
 import os
+from pathlib import Path
 from typing import NamedTuple
+
+from jinja2 import Environment, PackageLoader, select_autoescape, \
+    FileSystemLoader
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 class JWTSettings(NamedTuple):
@@ -9,7 +15,7 @@ class JWTSettings(NamedTuple):
 
 jwt_settings = JWTSettings(
     secret_key=os.environ.get('JWT_SECRET_KEY', 'SECRET'),
-    lifetime=int(os.environ.get('JWT_LIFETIME', 3600))
+    lifetime=int(os.environ.get('JWT_LIFETIME', 60*24))
 )
 
 
@@ -62,3 +68,25 @@ log_config = {
         "": {"handlers": ["default"], "level": "INFO"},
     },
 }
+
+APP_NAME = 'ND-Prediction'
+
+env = Environment(
+    loader=FileSystemLoader(str(BASE_DIR / 'templates')),
+    autoescape=select_autoescape()
+)
+
+
+class SMTPSettings(NamedTuple):
+    host: str
+    port: int
+    user: str
+    password: str
+
+
+smtp_settings = SMTPSettings(
+    os.environ.get('SMTP_HOST', 'smtp.yandex.ru'),
+    int(os.environ.get('SMTP_PORT', '465')),
+    os.environ.get('SMTP_USER', 'korolkevich.i@yandex.ru'),
+    os.environ.get('SMTP_PASSWORD', 'bcjsauoxkzyzvuwa'),
+)

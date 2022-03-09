@@ -1,7 +1,6 @@
 import logging
 from typing import Optional
 
-import celery
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers
 from fastapi_users.authentication import (
@@ -13,8 +12,9 @@ from fastapi_users.db import TortoiseUserDatabase
 
 from auth.db import get_user_db
 from auth.models import User, UserCreate, UserDB, UserUpdate
-from settings import jwt_settings, send_verify_email_task
-
+from service.tasks import send_email
+from settings import jwt_settings
+from tools.email_builder import EmailBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +32,16 @@ class UserManager(BaseUserManager[UserCreate, UserDB]):
     async def on_after_forgot_password(
         self, user: UserDB, token: str, request: Optional[Request] = None
     ):
+        subject, html_message = EmailBuilder.build_conformation_email(token)
+        send_email.send(user.email, subject, html_message)
         logger.info(f"User {user.id} has forgot their password. "
                     f"Reset token: {token}")
 
     async def on_after_request_verify(
         self, user: UserDB, token: str, request: Optional[Request] = None
     ):
-        
-        celery.signature(
-            send_verify_email_task.name, args=(user.email, token)
-        ).set(queue=send_verify_email_task.queue).apply_async()
+        subject, html_message = EmailBuilder.build_conformation_email(token)
+        send_email.send(user.email, subject, html_message)
         logger.info(f"Verification requested for user {user.id}. "
                     f"Verification token: {token}")
 
