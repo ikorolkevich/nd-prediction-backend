@@ -1,9 +1,7 @@
 import abc
 from typing import Tuple
 
-from jinja2 import Environment, PackageLoader, select_autoescape
-
-import settings
+from settings import env, SETTINGS
 
 
 class BaseEmail:
@@ -29,7 +27,7 @@ class ConfirmEmail(BaseEmail):
         self.key = key
 
     def get_subject(self) -> str:
-        return f'Email conformation. {settings.APP_NAME.upper()}'
+        return f'Email conformation. {SETTINGS.backend.app_name.upper()}'
 
     def get_context(self) -> dict:
         return {
@@ -43,7 +41,7 @@ class EmailBuilder:
     def _build(cls, email_obj: BaseEmail) -> Tuple[str, str]:
         context = email_obj.get_context()
         subject = email_obj.get_subject()
-        template = settings.env.get_template(email_obj.get_template())
+        template = env.get_template(email_obj.get_template())
         return subject, template.render(**context)
 
     @classmethod

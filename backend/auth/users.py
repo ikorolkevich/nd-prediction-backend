@@ -10,19 +10,19 @@ from fastapi_users.authentication import (
 )
 from fastapi_users.db import TortoiseUserDatabase
 
-from auth.db import get_user_db
-from auth.models import User, UserCreate, UserDB, UserUpdate
+from backend.auth.db import get_user_db
+from backend.auth.models import User, UserCreate, UserDB, UserUpdate
 from service.tasks import send_email
-from settings import jwt_settings
-from tools.email_builder import EmailBuilder
+from backend.auth.email_builder import EmailBuilder
+from settings import SETTINGS
 
 logger = logging.getLogger(__name__)
 
 
 class UserManager(BaseUserManager[UserCreate, UserDB]):
     user_db_model = UserDB
-    reset_password_token_secret = jwt_settings.secret_key
-    verification_token_secret = jwt_settings.secret_key
+    reset_password_token_secret = SETTINGS.backend.jwt.secret_key
+    verification_token_secret = SETTINGS.backend.jwt.secret_key
 
     async def on_after_register(
             self, user: UserDB, request: Optional[Request] = None
@@ -57,7 +57,8 @@ bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(
-        secret=jwt_settings.secret_key, lifetime_seconds=jwt_settings.lifetime
+        secret=SETTINGS.backend.jwt.secret_key,
+        lifetime_seconds=SETTINGS.backend.jwt.lifetime
     )
 
 

@@ -1,25 +1,19 @@
-import os
+import json
 from pathlib import Path
-from typing import NamedTuple
 
-from jinja2 import Environment, PackageLoader, select_autoescape, \
-    FileSystemLoader
+from pydantic import BaseModel
+from jinja2 import Environment, select_autoescape, FileSystemLoader
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
 
-class JWTSettings(NamedTuple):
+class JWTSettings(BaseModel):
     secret_key: str
     lifetime: int
 
 
-jwt_settings = JWTSettings(
-    secret_key=os.environ.get('JWT_SECRET_KEY', 'SECRET'),
-    lifetime=int(os.environ.get('JWT_LIFETIME', 60*24))
-)
-
-
-class PSQLDatabaseSettings(NamedTuple):
+class PSQLDatabaseSettings(BaseModel):
     user: str
     password: str
     host: str
@@ -27,26 +21,44 @@ class PSQLDatabaseSettings(NamedTuple):
     db: str
 
 
-psql_database_settings = PSQLDatabaseSettings(
-    user=os.environ.get('PSQL_DATABASE_USER', 'user'),
-    password=os.environ.get('PSQL_DATABASE_PASSWORD', 'password'),
-    host=os.environ.get('PSQL_DATABASE_HOST', '127.0.0.1'),
-    port=int(os.environ.get('PSQL_DATABASE_PORT', 5432)),
-    db=os.environ.get('PSQL_DATABASE_DB', 'db'),
-)
+class SMTPSettings(BaseModel):
+    host: str
+    port: int
+    user: str
+    password: str
 
 
-class TaskConfig(NamedTuple):
-    name: str
-    queue: str
+class BackendSettings(BaseModel):
+    jwt: JWTSettings
+    psql: PSQLDatabaseSettings
+    app_name: str
 
 
-send_verify_email_task = TaskConfig(
-    name=os.environ.get('SEND_VERIFY_EMAIL', 'send_verify_email_task'),
-    queue=os.environ.get('SEND_VERIFY_EMAIL_QUEUE', 'SEND_VERIFY_EMAIL')
-)
+class RabbitmqSettings(BaseModel):
+    user: str
+    password: str
+    host: str
+    port: int
+    vhost: str
 
-log_config = {
+
+class TasksSettings(BaseModel):
+    max_retries: int
+    send_email_queue: str
+
+
+class ServiceSettings(BaseModel):
+    tasks: TasksSettings
+    smtp: SMTPSettings
+
+
+class Settings(BaseModel):
+    backend: BackendSettings
+    service: ServiceSettings
+    rabbit: RabbitmqSettings
+
+
+loging_config = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
@@ -69,24 +81,11 @@ log_config = {
     },
 }
 
-APP_NAME = 'ND-Prediction'
-
 env = Environment(
     loader=FileSystemLoader(str(BASE_DIR / 'templates')),
     autoescape=select_autoescape()
 )
 
 
-class SMTPSettings(NamedTuple):
-    host: str
-    port: int
-    user: str
-    password: str
-
-
-smtp_settings = SMTPSettings(
-    os.environ.get('SMTP_HOST', 'smtp.yandex.ru'),
-    int(os.environ.get('SMTP_PORT', '465')),
-    os.environ.get('SMTP_USER', 'korolkevich.i@yandex.ru'),
-    os.environ.get('SMTP_PASSWORD', 'bcjsauoxkzyzvuwa'),
-)
+with open(BASE_DIR / 'dev.config.json', 'r') as config_file:
+    SETTINGS = Settings(**json.load(config_file))
