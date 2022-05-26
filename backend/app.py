@@ -1,84 +1,33 @@
-import asyncio
-import json
+import datetime
 from logging.config import dictConfig
 
-import aio_pika
 import uvicorn
-from aio_pika import IncomingMessage
-from fastapi import Depends, FastAPI, WebSocketDisconnect, WebSocket, status
+from fastapi import Depends, FastAPI
 from tortoise.contrib.fastapi import register_tortoise
+from fastapi.middleware.cors import CORSMiddleware
+from tortoise.query_utils import Q
 
-from backend.auth.models import UserDB
 from backend.auth.users import auth_backend, \
-    current_active_user, fastapi_users, \
-    get_jwt_strategy, get_user_manager, UserManager
-from connection_manager import ConnectionManager
-
+    current_active_user, fastapi_users
+from backend.nd_prediction.models import ForestFirePredictions, \
+    ForestFirePredictionsPydantic
+from backend.nd_prediction.schemas import FFProbabilityResponse
 from settings import loging_config, SETTINGS
 
 
 dictConfig(loging_config)
 app = FastAPI()
-connection_manager = ConnectionManager()
+origins = [
+    "http://localhost:3000",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-
-async def rabbitmq_consume(queue_name: str) -> None:
-    connection = await aio_pika.connect_robust(
-        host=SETTINGS.rabbit.host,
-        port=SETTINGS.rabbit.port,
-        login=SETTINGS.rabbit.user,
-        password=SETTINGS.rabbit.password,
-        virtualhost=SETTINGS.rabbit.vhost,
-    )
-    async with connection:
-        channel = await connection.channel()
-        await channel.set_qos(prefetch_count=10)
-        queue = await channel.declare_queue(queue_name)
-        message: IncomingMessage
-        async with queue.iterator() as queue_iter:
-            async for message in queue_iter:
-                async with message.process():
-                    msg = json.loads(message.body.decode())
-                    await connection_manager.broadcast(msg)
-
-
-@app.on_event("startup")
-def startup():
-    asyncio.ensure_future(rabbitmq_consume('backend'))
-
-
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(
-        websocket: WebSocket, client_id: int,
-        user_manager: UserManager = Depends(get_user_manager)
-):
-    await websocket.accept()
-    strategy = get_jwt_strategy()
-    token: str = websocket.headers.get('Authorization')
-    token = token if token is None else token.replace('Bearer ', '')
-    user = await strategy.read_token(
-         token, user_manager
-    )
-    if not (user is not None and user.is_active):
-        await websocket.send_json({'msg': 'Unauthorized'})
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    await connection_manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_json()
-            await connection_manager.send_personal_message(
-                {'client_id': client_id, 'says': data}, websocket
-            )
-            await connection_manager.broadcast(
-                {'client_id': client_id, 'says': data}
-            )
-    except WebSocketDisconnect:
-        connection_manager.disconnect(websocket)
-        await connection_manager.broadcast(
-            {'client_id': client_id, 'event': 'left'}
-        )
 
 
 app.include_router(
@@ -107,9 +56,33 @@ app.include_router(
 )
 
 
-@app.get("/authenticated-route")
-async def authenticated_route(user: UserDB = Depends(current_active_user)):
-    return {"message": f"Hello {user.email}!"}
+@app.get(
+    "/api/weather/current_situation", dependencies=[Depends(current_active_user)],
+    response_model=ForestFirePredictionsPydantic,
+    tags=['weather']
+)
+async def current_situation():
+    today = datetime.date.today()
+    today = datetime.date(today.year - 1, today.month, today.day)
+    qs = ForestFirePredictions.get(date=today)
+    return await ForestFirePredictionsPydantic.from_queryset_single(qs)
+
+
+@app.get(
+    "/api/weather/ff_probabilities_dynamic",
+    dependencies=[Depends(current_active_user)],
+    response_model=FFProbabilityResponse,
+    tags=['weather']
+)
+async def ff_probabilities_dynamic():
+    today = datetime.date.today()
+    today = datetime.date(today.year - 1, today.month, today.day)
+    days = [today - datetime.timedelta(days=i) for i in range(1, 3)]
+    days.append(today)
+    for i in range(1, 3):
+        days.append(today + datetime.timedelta(days=i))
+    qs = await ForestFirePredictions.filter(Q(date__in=days))
+    return FFProbabilityResponse(dynamic_data=qs)
 
 
 register_tortoise(
@@ -118,7 +91,7 @@ register_tortoise(
            f'{SETTINGS.backend.psql.user}:{SETTINGS.backend.psql.password}@'
            f'{SETTINGS.backend.psql.host}:{SETTINGS.backend.psql.port}/'
            f'{SETTINGS.backend.psql.db}',
-    modules={"models": ["backend.auth.models"]},
+    modules={"models": ["backend.auth.models", "backend.nd_prediction.models"]},
     generate_schemas=True
 )
 

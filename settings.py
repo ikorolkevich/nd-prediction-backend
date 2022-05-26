@@ -2,8 +2,6 @@ import json
 from pathlib import Path
 
 from pydantic import BaseModel
-from jinja2 import Environment, select_autoescape, FileSystemLoader
-
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -34,28 +32,8 @@ class BackendSettings(BaseModel):
     app_name: str
 
 
-class RabbitmqSettings(BaseModel):
-    user: str
-    password: str
-    host: str
-    port: int
-    vhost: str
-
-
-class TasksSettings(BaseModel):
-    max_retries: int
-    send_email_queue: str
-
-
-class ServiceSettings(BaseModel):
-    tasks: TasksSettings
-    smtp: SMTPSettings
-
-
 class Settings(BaseModel):
     backend: BackendSettings
-    service: ServiceSettings
-    rabbit: RabbitmqSettings
 
 
 loging_config = {
@@ -80,11 +58,6 @@ loging_config = {
         "": {"handlers": ["default"], "level": "INFO"},
     },
 }
-
-env = Environment(
-    loader=FileSystemLoader(str(BASE_DIR / 'templates')),
-    autoescape=select_autoescape()
-)
 
 
 with open(BASE_DIR / 'dev.config.json', 'r') as config_file:

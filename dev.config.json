@@ -12,24 +12,5 @@
       "db": "db"
     },
     "app_name": "ND-Prediction System"
-  },
-  "service": {
-    "tasks": {
-      "send_email_queue": "SEND_EMAIL",
-      "max_retries": 0
-    },
-    "smtp": {
-      "host": "smtp.yandex.ru",
-      "port": "465",
-      "user": "korolkevich.i@yandex.ru",
-      "password": "bcjsauoxkzyzvuwa"
-    }
-  },
-  "rabbit": {
-    "user": "guest",
-    "password": "guest",
-    "host": "127.0.0.1",
-    "port": "5672",
-    "vhost": "vhost1"
   }
 }

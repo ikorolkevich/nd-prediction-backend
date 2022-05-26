@@ -1,8 +1,10 @@
 import logging
-from typing import Optional
+import re
+from typing import Optional, Union
 
 from fastapi import Depends, Request
-from fastapi_users import BaseUserManager, FastAPIUsers
+from fastapi_users import BaseUserManager, FastAPIUsers, \
+    InvalidPasswordException
 from fastapi_users.authentication import (
     AuthenticationBackend,
     BearerTransport,
@@ -12,8 +14,6 @@ from fastapi_users.db import TortoiseUserDatabase
 
 from backend.auth.db import get_user_db
 from backend.auth.models import User, UserCreate, UserDB, UserUpdate
-from service.tasks import send_email
-from backend.auth.email_builder import EmailBuilder
 from settings import SETTINGS
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,9 @@ class UserManager(BaseUserManager[UserCreate, UserDB]):
     user_db_model = UserDB
     reset_password_token_secret = SETTINGS.backend.jwt.secret_key
     verification_token_secret = SETTINGS.backend.jwt.secret_key
+    password_regex = re.compile(
+        r"^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9])(?!.*\s).{8,15}$"
+    )
 
     async def on_after_register(
             self, user: UserDB, request: Optional[Request] = None
@@ -32,27 +35,36 @@ class UserManager(BaseUserManager[UserCreate, UserDB]):
     async def on_after_forgot_password(
         self, user: UserDB, token: str, request: Optional[Request] = None
     ):
-        subject, html_message = EmailBuilder.build_conformation_email(token)
-        send_email.send(user.email, subject, html_message)
-        logger.info(f"User {user.id} has forgot their password. "
-                    f"Reset token: {token}")
+        logger.info(
+            f"User {user.id} has forgot their password. Reset token: {token}"
+        )
 
     async def on_after_request_verify(
         self, user: UserDB, token: str, request: Optional[Request] = None
     ):
-        subject, html_message = EmailBuilder.build_conformation_email(token)
-        send_email.send(user.email, subject, html_message)
-        logger.info(f"Verification requested for user {user.id}. "
-                    f"Verification token: {token}")
+        logger.info(
+            f"Verification requested for user {user.id}. "
+            f"Verification token: {token}"
+        )
+
+    async def validate_password(
+            self,
+            password: str,
+            user: Union[UserCreate, UserDB],
+    ) -> None:
+        if re.search(self.password_regex, password) is None:
+            raise InvalidPasswordException(
+                reason="Пароль должен содержать от 8 до 15 символов, "
+                       "содержать по крайней мере одну строчную букву, "
+                       "одну прописную букву, одну цифру и "
+                       "один специальный символ"
+            )
 
 
 async def get_user_manager(
         user_db: TortoiseUserDatabase = Depends(get_user_db)
 ):
     yield UserManager(user_db)
-
-
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 
 
 def get_jwt_strategy() -> JWTStrategy:
@@ -62,6 +74,7 @@ def get_jwt_strategy() -> JWTStrategy:
     )
 
 
+bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 auth_backend = AuthenticationBackend(
     name="jwt",
     transport=bearer_transport,
