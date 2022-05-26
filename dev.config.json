@@ -1,8 +1,8 @@
 {
   "backend": {
     "jwt": {
-      "secret_key": "SECRET",
-      "lifetime": 1800
+      "secret_key": "naDXq_nsSPCRNH_T2WtikXZLEmALJ76cfOERDY1-Mg0",
+      "lifetime": 86400
     },
     "psql": {
       "user": "user",
@@ -10,7 +10,6 @@
       "host": "127.0.0.1",
       "port": 5432,
       "db": "db"
-    },
-    "app_name": "ND-Prediction System"
+    }
   }
 }

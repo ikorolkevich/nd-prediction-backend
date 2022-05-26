@@ -1,21 +1,13 @@
-import datetime
-from logging.config import dictConfig
-
 import uvicorn
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from tortoise.contrib.fastapi import register_tortoise
 from fastapi.middleware.cors import CORSMiddleware
-from tortoise.query_utils import Q
 
-from backend.auth.users import auth_backend, \
-    current_active_user, fastapi_users
-from backend.nd_prediction.models import ForestFirePredictions, \
-    ForestFirePredictionsPydantic
-from backend.nd_prediction.schemas import FFProbabilityResponse
-from settings import loging_config, SETTINGS
+from backend.auth.users import auth_backend, fastapi_users
+from backend.nd_prediction.router import weather_router
+from backend.settings import SETTINGS
 
 
-dictConfig(loging_config)
 app = FastAPI()
 origins = [
     "http://localhost:3000",
@@ -27,8 +19,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 
 app.include_router(
     fastapi_users.get_auth_router(auth_backend),
@@ -55,34 +45,7 @@ app.include_router(
     tags=["users"]
 )
 
-
-@app.get(
-    "/api/weather/current_situation", dependencies=[Depends(current_active_user)],
-    response_model=ForestFirePredictionsPydantic,
-    tags=['weather']
-)
-async def current_situation():
-    today = datetime.date.today()
-    today = datetime.date(today.year - 1, today.month, today.day)
-    qs = ForestFirePredictions.get(date=today)
-    return await ForestFirePredictionsPydantic.from_queryset_single(qs)
-
-
-@app.get(
-    "/api/weather/ff_probabilities_dynamic",
-    dependencies=[Depends(current_active_user)],
-    response_model=FFProbabilityResponse,
-    tags=['weather']
-)
-async def ff_probabilities_dynamic():
-    today = datetime.date.today()
-    today = datetime.date(today.year - 1, today.month, today.day)
-    days = [today - datetime.timedelta(days=i) for i in range(1, 3)]
-    days.append(today)
-    for i in range(1, 3):
-        days.append(today + datetime.timedelta(days=i))
-    qs = await ForestFirePredictions.filter(Q(date__in=days))
-    return FFProbabilityResponse(dynamic_data=qs)
+app.include_router(weather_router, prefix="/api/weather", tags=["weather"])
 
 
 register_tortoise(

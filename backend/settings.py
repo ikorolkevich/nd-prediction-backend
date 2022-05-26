@@ -1,9 +1,11 @@
 import json
+from logging.config import dictConfig
 from pathlib import Path
 
 from pydantic import BaseModel
 
-BASE_DIR = Path(__file__).resolve().parent
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class JWTSettings(BaseModel):
@@ -29,7 +31,6 @@ class SMTPSettings(BaseModel):
 class BackendSettings(BaseModel):
     jwt: JWTSettings
     psql: PSQLDatabaseSettings
-    app_name: str
 
 
 class Settings(BaseModel):
@@ -62,3 +63,5 @@ loging_config = {
 
 with open(BASE_DIR / 'dev.config.json', 'r') as config_file:
     SETTINGS = Settings(**json.load(config_file))
+
+dictConfig(loging_config)

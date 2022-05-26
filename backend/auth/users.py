@@ -14,7 +14,7 @@ from fastapi_users.db import TortoiseUserDatabase
 
 from backend.auth.db import get_user_db
 from backend.auth.models import User, UserCreate, UserDB, UserUpdate
-from settings import SETTINGS
+from backend.settings import SETTINGS
 
 logger = logging.getLogger(__name__)
 
