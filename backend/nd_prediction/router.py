@@ -20,6 +20,7 @@ weather_router = APIRouter()
 )
 async def current_situation():
     today = datetime.date.today()
+    # TODO remove after deploying
     today = datetime.date(today.year - 1, today.month, today.day)
     qs = ForestFirePredictions.get(date=today)
     return await ForestFirePredictionsPydantic.from_queryset_single(qs)
@@ -33,6 +34,7 @@ async def current_situation():
 )
 async def ff_probabilities_dynamic():
     today = datetime.date.today()
+    # TODO remove after deploying
     today = datetime.date(today.year - 1, today.month, today.day)
     days = [today - datetime.timedelta(days=i) for i in range(1, 3)]
     days.append(today)
