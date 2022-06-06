@@ -1,0 +1,15 @@
+{
+  "backend": {
+    "jwt": {
+      "secret_key": "naDXq_nsSPCRNH_T2WtikXZLEmALJ76cfOERDY1-Mg0",
+      "lifetime": 86400
+    },
+    "psql": {
+      "user": "user",
+      "password": "password",
+      "host": "127.0.0.1",
+      "port": 5432,
+      "db": "db"
+    }
+  }
+}
